@@ -1,0 +1,7 @@
+google-generativeai
+openpyxl
+pdf2image
+opencv-python-headless
+pytesseract
+pandas
+numpy

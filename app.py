@@ -47,8 +47,8 @@ if uploaded_file and API_KEY:
             images[0].save(img_bytes, format='JPEG')
             base64_image = base64.b64encode(img_bytes.getvalue()).decode('utf-8')
 
-            # Doğrudan Gemini v1 Kararlı REST API Çağrısı (404 hatasını %100 engeller)
-            url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={API_KEY}"
+            # Güncel ve aktif model uç noktası (gemini-2.5-flash)
+            url = f"https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key={API_KEY}"
             
             prompt_text = """
             Sen kıdemli bir imalat ve endüstri mühendisisin. Bu teknik resmi detaylıca incele ve şu bilgileri eksiksiz bir JSON formatında ver:

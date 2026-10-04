@@ -1,18 +1,19 @@
 import streamlit as st
-import urllib.request
-import json
-import base64
+import google.generativeai as genai
 from pdf2image import convert_from_bytes
 import pandas as pd
 import io
+import json
 import math
 
-# --- GEMINI API ANAHTARI KONTROLÜ ---
+# --- GEMINI YAPAY ZEKA BAĞLANTISI ---
 if "GEMINI_API_KEY" in st.secrets:
-    API_KEY = st.secrets["GEMINI_API_KEY"]
+    try:
+        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+    except Exception as e:
+        st.error(f"API Yapılandırma Hatası: {e}")
 else:
     st.error("⚠️ API Anahtarı bulunamadı! Lütfen Streamlit Secrets ayarlarına GEMINI_API_KEY ekleyin.")
-    API_KEY = None
 
 # --- VERİTABANI & SAAT ÜCRETLERİ ---
 MAKINE_VERILERI = {
@@ -34,10 +35,9 @@ with col2:
 
 uploaded_file = st.file_uploader("Teknik Resim Yükle (PDF)", type=["pdf"])
 
-if uploaded_file and API_KEY:
+if uploaded_file:
     with st.spinner("🧠 Kıdemli Üretim Mühendisi Yapay Zeka Teknik Resmi İnceliyor..."):
         try:
-            # PDF'i yüksek çözünürlüklü görsele ve base64 formatına çevir
             images = convert_from_bytes(uploaded_file.read(), dpi=300)
             if not images:
                 st.error("PDF görselleştirilemedi.")
@@ -45,12 +45,11 @@ if uploaded_file and API_KEY:
                 
             img_bytes = io.BytesIO()
             images[0].save(img_bytes, format='JPEG')
-            base64_image = base64.b64encode(img_bytes.getvalue()).decode('utf-8')
+            image_data = img_bytes.getvalue()
 
-            # Güncel ve aktif model uç noktası (gemini-2.5-flash)
-            url = f"https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key={API_KEY}"
-            
-            prompt_text = """
+            # En güncel kararlı Google kütüphanesi ve model tanımı
+            model = genai.GenerativeModel('gemini-3.8-flash')
+            prompt = """
             Sen kıdemli bir imalat ve endüstri mühendisisin. Bu teknik resmi detaylıca incele ve şu bilgileri eksiksiz bir JSON formatında ver:
             1. geometri: Parçanın geometrisi ("Silindirik (Mil/Boru)" veya "Prizmatik (Plaka/Kütük)").
             2. dis_cap: Silindirikse dış çap (mm cinsinden sayı). Prizmatikse 0 yaz.
@@ -74,31 +73,12 @@ if uploaded_file and API_KEY:
             }
             """
 
-            payload = {
-                "contents": [{
-                    "parts": [
-                        {"text": prompt_text},
-                        {
-                            "inline_data": {
-                                "mime_type": "image/jpeg",
-                                "data": base64_image
-                            }
-                        }
-                    ]
-                }]
-            }
-
-            req = urllib.request.Request(
-                url,
-                data=json.dumps(payload).encode('utf-8'),
-                headers={'Content-Type': 'application/json'}
-            )
-
-            with urllib.request.urlopen(req) as response:
-                res_json = json.loads(response.read().decode('utf-8'))
-                raw_text = res_json['candidates'][0]['content']['parts'][0]['text']
-
-            clean_text = raw_text.replace("```json", "").replace("```", "").strip()
+            response = model.generate_content([
+                {'mime_type': 'image/jpeg', 'data': image_data},
+                prompt
+            ])
+            
+            clean_text = response.text.replace("```json", "").replace("```", "").strip()
             veri = json.loads(clean_text)
 
             st.success("✅ Teknik Resim Başarıyla Analiz Edildi!")
@@ -116,7 +96,7 @@ if uploaded_file and API_KEY:
                 b_z = c3.number_input("Kalınlık (Z mm):", value=float(veri["kalinlik"]))
 
             if veri.get("kritik_notlar"):
-                st.warning(f"⚠️ **Üretim ve Kalite Notları:** {veri['kritik_notlar']}")
+                st.warning(f"⚠️ **Üretim danışmanı Notu:** {veri['kritik_notlar']}")
 
             st.markdown("### 📋 Adım Adım İmalat Rotası (Üretim Planı)")
             st.info(veri.get("uretim_rotasi", "Rota belirtilmedi."))
